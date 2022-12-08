@@ -1,5 +1,53 @@
-from itertools import product as itp
+"""
+Module containing different metrics and helpers to calculate them
+"""
 import pandas as pd
+import numpy as np
+from pycox.evaluation import EvalSurv
+from itertools import product as itp
+
+def calculate_preds(output_raw, y_surv_, y_cens_):
+    """
+    Evaluator for benchmark testings
+
+    Parameters
+    ----------
+    output_raw: list of arrays
+        the predictions from a DeepKaplanMeier model
+
+    y_surv_: np.array
+        the array with the observed test survival times
+
+    y_cens_: np.array
+        the array specifying whether an event was observed
+        if the event was observed it needs to be coded as 
+        1, if the observation was censored as 0
+
+    returns:
+        concordance index and brier score as floats
+    """
+    output_ = (pd.DataFrame(list(map(np.ravel, output_raw)))
+                                .reset_index()
+                                .rename(columns={'index':'timeline'}))
+
+    time_idx = np.array(output_['timeline'].astype(float))
+    output_ = output_.set_index(time_idx).drop(columns='timeline')
+
+    evaluation_results = EvalSurv(output_,
+                                    y_surv_,
+                                    y_cens_,
+                                    censor_surv='km')
+    
+    linspace_brier = np.linspace(y_surv_.min(), 
+                                 y_surv_.max(), 
+                                 100)
+    
+    
+    concordance_idx = evaluation_results.concordance_td('antolini')
+    brier_idx = evaluation_results.integrated_brier_score(linspace_brier) 
+
+    return concordance_idx, brier_idx
+
 
 def calculate_concordance_surv(survival_, censoring_, pred_matrix):
     """
